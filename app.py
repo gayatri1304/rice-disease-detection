@@ -5,7 +5,7 @@ from flask import Flask, render_template, request
 from werkzeug.utils import secure_filename
 from tensorflow.keras.models import load_model
 from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
-from PIL import Image   # ✅ IMPORTANT FIX
+from PIL import Image
 
 # -------------------------------
 # BASE DIRECTORY
@@ -13,17 +13,36 @@ from PIL import Image   # ✅ IMPORTANT FIX
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # -------------------------------
-# LOAD MODEL
+# FLASK APP
 # -------------------------------
-model_path = os.path.join(BASE_DIR, "rice_model.keras")
-model = load_model(model_path)
+app = Flask(__name__)
 
 # -------------------------------
-# LOAD CLASS NAMES
+# UPLOAD FOLDER
 # -------------------------------
-class_path = os.path.join(BASE_DIR, "class_names.json")
-with open(class_path, "r") as f:
-    class_names = json.load(f)
+UPLOAD_FOLDER = os.path.join(BASE_DIR, "static/uploads")
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+# -------------------------------
+# LOAD MODEL (SAFE LOAD)
+# -------------------------------
+model = None
+class_names = []
+
+def load_resources():
+    global model, class_names
+
+    if model is None:
+        model_path = os.path.join(BASE_DIR, "rice_model.keras")
+        model = load_model(model_path)
+        print("✅ Model loaded")
+
+    if not class_names:
+        class_path = os.path.join(BASE_DIR, "class_names.json")
+        with open(class_path, "r") as f:
+            class_names.extend(json.load(f))
+        print("✅ Class names loaded")
 
 # -------------------------------
 # DISEASE INFO
@@ -59,20 +78,12 @@ def load_accuracy():
 model_accuracy = load_accuracy()
 
 # -------------------------------
-# FLASK SETUP
-# -------------------------------
-app = Flask(__name__)
-
-UPLOAD_FOLDER = os.path.join(BASE_DIR, "static/uploads")
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-
-# -------------------------------
-# PREDICTION FUNCTION (FINAL FIX)
+# PREDICTION FUNCTION
 # -------------------------------
 def predict_image(filepath):
     try:
-        # ✅ Robust image loading using PIL
+        load_resources()  # ensure model is loaded
+
         img = Image.open(filepath).convert("RGB")
         img = img.resize((224, 224))
 
@@ -87,7 +98,6 @@ def predict_image(filepath):
 
         label = class_names[predicted_class]
 
-        # 🎯 HANDLE UNKNOWN CLASS
         if label == "Other":
             return "Sorry, I know only 3 rice diseases 😅", None, None, None
 
@@ -97,8 +107,8 @@ def predict_image(filepath):
         return label, confidence, treatment, precaution
 
     except Exception as e:
-        print("PREDICTION ERROR:", str(e))
-        return "Invalid image or unsupported file ❌", None, None, None
+        print("❌ PREDICTION ERROR:", str(e))
+        return "Invalid image ❌", None, None, None
 
 # -------------------------------
 # ROUTE
@@ -129,14 +139,18 @@ def index():
             )
 
         except Exception as e:
-            print("ROUTE ERROR:", str(e))
+            print("❌ ROUTE ERROR:", str(e))
             return render_template("index.html", label="Error processing image ❌")
 
     return render_template("index.html")
 
 # -------------------------------
-# RUN
+# RENDER PORT FIX
+# -------------------------------
+port = int(os.environ.get("PORT", 10000))
+
+# -------------------------------
+# RUN (LOCAL ONLY)
 # -------------------------------
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
