@@ -8,18 +8,18 @@ from tensorflow.keras.preprocessing import image
 from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
 
 # -------------------------------
-# BASE DIRECTORY (IMPORTANT FIX)
+# BASE DIRECTORY
 # -------------------------------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # -------------------------------
-# LOAD MODEL (FIXED PATH)
+# LOAD MODEL
 # -------------------------------
 model_path = os.path.join(BASE_DIR, "rice_model.keras")
 model = load_model(model_path)
 
 # -------------------------------
-# LOAD CLASS NAMES (FIXED PATH)
+# LOAD CLASS NAMES
 # -------------------------------
 class_path = os.path.join(BASE_DIR, "class_names.json")
 with open(class_path, "r") as f:
@@ -31,14 +31,14 @@ with open(class_path, "r") as f:
 disease_info = {
     "False Smut": {
         "treatment": "Apply fungicides like Propiconazole or Carbendazim.",
-        "precaution": "Use certified seeds, avoid excess nitrogen fertilizer, maintain field hygiene."
+        "precaution": "Use certified seeds, avoid excess nitrogen fertilizer."
     },
     "Leaf Smut": {
         "treatment": "Spray Mancozeb or Copper fungicides.",
         "precaution": "Ensure proper spacing and avoid water stagnation."
     },
     "Narrow Brown Leaf Spot": {
-        "treatment": "Apply fungicides like Tricyclazole.",
+        "treatment": "Apply Tricyclazole.",
         "precaution": "Use resistant varieties and balanced fertilization."
     }
 }
@@ -64,16 +64,14 @@ model_accuracy = load_accuracy()
 app = Flask(__name__)
 
 UPLOAD_FOLDER = os.path.join(BASE_DIR, "static/uploads")
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 # -------------------------------
 # PREDICTION FUNCTION
 # -------------------------------
 def predict_image(filepath):
-
     img = image.load_img(filepath, target_size=(224, 224))
     img_array = image.img_to_array(img)
     img_array = preprocess_input(img_array)
@@ -86,11 +84,10 @@ def predict_image(filepath):
 
     label = class_names[predicted_class]
 
-    # 🎯 HANDLE UNKNOWN CLASS
+    # Handle unknown
     if label == "Other":
         return "Sorry, I know only 3 rice diseases 😅", None, None, None
 
-    # ✅ Normal case
     treatment = disease_info.get(label, {}).get("treatment", "")
     precaution = disease_info.get(label, {}).get("precaution", "")
 
@@ -102,9 +99,12 @@ def predict_image(filepath):
 @app.route("/", methods=["GET", "POST"])
 def index():
     if request.method == "POST":
-        file = request.files["file"]
+        try:
+            file = request.files.get("file")
 
-        if file:
+            if not file or file.filename == "":
+                return render_template("index.html", label="Please upload an image")
+
             filename = secure_filename(file.filename)
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             file.save(filepath)
@@ -120,6 +120,10 @@ def index():
                 treatment=treatment,
                 precaution=precaution
             )
+
+        except Exception as e:
+            print("ERROR:", str(e))
+            return render_template("index.html", label="Something went wrong")
 
     return render_template("index.html")
 

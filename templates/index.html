@@ -6,11 +6,10 @@
 
 <body style="
     margin:0;
-    font-family: Arial, sans-serif;
+    font-family: Arial;
     background-image: url('/static/rice_bg.jpg.jpg');
     background-size: cover;
     background-position: center;
-    background-repeat: no-repeat;
     background-attachment: fixed;
 ">
 
@@ -22,47 +21,40 @@
     background: rgba(0,0,0,0.7);
     color:white;
     border-radius: 15px;
-    box-shadow: 0px 0px 20px rgba(0,0,0,0.5);
 ">
 
     <h2>🌾 Rice Disease Detection</h2>
 
     <form method="POST" enctype="multipart/form-data">
         <input type="file" name="file" required><br><br>
-        <button style="padding:10px 20px; background:#4CAF50; color:white; border:none; border-radius:5px;">
+        <button style="padding:10px 20px; background:#4CAF50; color:white;">
             Predict
         </button>
     </form>
 
     {% if label %}
-    <div style="margin-top:20px;">
+        <div style="margin-top:20px;">
+            <h3>{{ label }}</h3>
 
-        <!-- Prediction -->
-        <h3>Prediction: {{ label }}</h3>
+            {% if confidence %}
+                <h4>Confidence: {{ confidence }}%</h4>
+                <h4>Model Accuracy: {{ accuracy }}%</h4>
+            {% endif %}
 
-        <!-- Show confidence only if it's a valid disease -->
-        {% if confidence and "Sorry" not in label %}
-            <h3>Confidence: {{ confidence }}%</h3>
-        {% endif %}
+            {% if treatment %}
+                <h4>💊 Treatment:</h4>
+                <p>{{ treatment }}</p>
 
-        <!-- Always show model accuracy -->
-        <h3>Model Accuracy: {{ accuracy }}%</h3>
+                <h4>⚠️ Precautions:</h4>
+                <p>{{ precaution }}</p>
+            {% endif %}
 
-        <!-- Show treatment only for valid diseases -->
-        {% if treatment %}
-            <h4 style="margin-top:20px;">💊 Treatment:</h4>
-            <p>{{ treatment }}</p>
-
-            <h4>⚠️ Precautions:</h4>
-            <p>{{ precaution }}</p>
-        {% endif %}
-
-        <!-- Image -->
-        <img src="{{ image_path }}" width="300" style="border-radius:10px; margin-top:10px;">
-    </div>
+            {% if image_path %}
+                <img src="{{ image_path }}" width="300" style="margin-top:10px;">
+            {% endif %}
+        </div>
     {% endif %}
 
 </div>
-
 </body>
 </html>
