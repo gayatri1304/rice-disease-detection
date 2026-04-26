@@ -25,24 +25,26 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 # -------------------------------
-# LOAD MODEL (SAFE LOAD)
+# LOAD MODEL AT STARTUP (FAST)
 # -------------------------------
-model = None
-class_names = []
+model_path = os.path.join(BASE_DIR, "rice_model.keras")
+model = load_model(model_path)
+print("✅ Model loaded")
 
-def load_resources():
-    global model, class_names
+# -------------------------------
+# LOAD CLASS NAMES
+# -------------------------------
+class_path = os.path.join(BASE_DIR, "class_names.json")
+with open(class_path, "r") as f:
+    class_names = json.load(f)
+print("✅ Class names loaded")
 
-    if model is None:
-        model_path = os.path.join(BASE_DIR, "rice_model.keras")
-        model = load_model(model_path)
-        print("✅ Model loaded")
-
-    if not class_names:
-        class_path = os.path.join(BASE_DIR, "class_names.json")
-        with open(class_path, "r") as f:
-            class_names.extend(json.load(f))
-        print("✅ Class names loaded")
+# -------------------------------
+# WARM UP MODEL (VERY IMPORTANT)
+# -------------------------------
+dummy = np.zeros((1, 224, 224, 3))
+model.predict(dummy)
+print("🔥 Model warmed up")
 
 # -------------------------------
 # DISEASE INFO
@@ -82,10 +84,8 @@ model_accuracy = load_accuracy()
 # -------------------------------
 def predict_image(filepath):
     try:
-        load_resources()
-
         img = Image.open(filepath).convert("RGB")
-        img = img.resize((224, 224))
+        img = img.resize((224, 224), Image.BILINEAR)
 
         img_array = np.array(img)
         img_array = preprocess_input(img_array)
@@ -98,7 +98,7 @@ def predict_image(filepath):
 
         label = class_names[predicted_class]
 
-        # ✅ UPDATED MESSAGE
+        # CUSTOM MESSAGE
         if label == "Other":
             return "Invalid image or unpredictable image ❌", None, None, None
 
@@ -146,7 +146,7 @@ def index():
     return render_template("index.html")
 
 # -------------------------------
-# PORT (FOR RENDER)
+# PORT (RENDER)
 # -------------------------------
 port = int(os.environ.get("PORT", 10000))
 
