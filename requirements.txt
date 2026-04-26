@@ -3,4 +3,4 @@ tensorflow==2.13.0
 numpy
 werkzeug
 gunicorn
-Pillow
+Pillow#force-update
