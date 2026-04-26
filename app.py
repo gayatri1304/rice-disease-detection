@@ -4,8 +4,8 @@ import numpy as np
 from flask import Flask, render_template, request
 from werkzeug.utils import secure_filename
 from tensorflow.keras.models import load_model
-from tensorflow.keras.preprocessing import image
 from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
+from PIL import Image   # ✅ IMPORTANT FIX
 
 # -------------------------------
 # BASE DIRECTORY
@@ -68,12 +68,15 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 # -------------------------------
-# PREDICTION FUNCTION (SAFE)
+# PREDICTION FUNCTION (FINAL FIX)
 # -------------------------------
 def predict_image(filepath):
     try:
-        img = image.load_img(filepath, target_size=(224, 224))
-        img_array = image.img_to_array(img)
+        # ✅ Robust image loading using PIL
+        img = Image.open(filepath).convert("RGB")
+        img = img.resize((224, 224))
+
+        img_array = np.array(img)
         img_array = preprocess_input(img_array)
         img_array = np.expand_dims(img_array, axis=0)
 
@@ -84,7 +87,7 @@ def predict_image(filepath):
 
         label = class_names[predicted_class]
 
-        # Handle unknown class
+        # 🎯 HANDLE UNKNOWN CLASS
         if label == "Other":
             return "Sorry, I know only 3 rice diseases 😅", None, None, None
 
@@ -98,7 +101,7 @@ def predict_image(filepath):
         return "Invalid image or unsupported file ❌", None, None, None
 
 # -------------------------------
-# ROUTE (SAFE)
+# ROUTE
 # -------------------------------
 @app.route("/", methods=["GET", "POST"])
 def index():

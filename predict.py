@@ -1,21 +1,33 @@
+from PIL import Image
+
 def predict_image(img_path):
-    img = image.load_img(img_path, target_size=(224, 224))
-    img_array = image.img_to_array(img)
-    img_array = preprocess_input(img_array)
-    img_array = np.expand_dims(img_array, axis=0)
+    try:
+        # 🔥 Load image safely using PIL
+        img = Image.open(img_path).convert("RGB")
+        img = img.resize((224, 224))
 
-    preds = model.predict(img_array)
-    confidence = float(np.max(preds)) * 100
-    predicted_class = np.argmax(preds)
+        # Convert to array
+        img_array = np.array(img)
+        img_array = preprocess_input(img_array)
+        img_array = np.expand_dims(img_array, axis=0)
 
-    label = class_names[predicted_class]
+        # Prediction
+        preds = model.predict(img_array)[0]
+        confidence = float(np.max(preds)) * 100
+        predicted_class = np.argmax(preds)
 
-    # 🎯 HANDLE "OTHER" CLASS
-    if label == "Other":
-        return "Unpredictable disease", None, None, None
+        label = class_names[predicted_class]
 
-    # ✅ Normal case
-    treatment = disease_info.get(label, {}).get("treatment", "")
-    precaution = disease_info.get(label, {}).get("precaution", "")
+        # 🎯 HANDLE "OTHER"
+        if label == "Other":
+            return "Sorry, I know only 3 rice diseases 😅", None, None, None
 
-    return label, confidence, treatment, precaution
+        # ✅ Normal case
+        treatment = disease_info.get(label, {}).get("treatment", "")
+        precaution = disease_info.get(label, {}).get("precaution", "")
+
+        return label, confidence, treatment, precaution
+
+    except Exception as e:
+        print("PREDICTION ERROR:", str(e))
+        return "Invalid image or unsupported file ❌", None, None, None
