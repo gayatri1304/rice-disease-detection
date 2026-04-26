@@ -8,14 +8,21 @@ from tensorflow.keras.preprocessing import image
 from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
 
 # -------------------------------
-# LOAD MODEL
+# BASE DIRECTORY (IMPORTANT FIX)
 # -------------------------------
-model = load_model("rice_model.keras")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # -------------------------------
-# LOAD CLASS NAMES
+# LOAD MODEL (FIXED PATH)
 # -------------------------------
-with open("class_names.json", "r") as f:
+model_path = os.path.join(BASE_DIR, "rice_model.keras")
+model = load_model(model_path)
+
+# -------------------------------
+# LOAD CLASS NAMES (FIXED PATH)
+# -------------------------------
+class_path = os.path.join(BASE_DIR, "class_names.json")
+with open(class_path, "r") as f:
     class_names = json.load(f)
 
 # -------------------------------
@@ -41,7 +48,8 @@ disease_info = {
 # -------------------------------
 def load_accuracy():
     try:
-        with open("metrics.txt", "r") as f:
+        metrics_path = os.path.join(BASE_DIR, "metrics.txt")
+        with open(metrics_path, "r") as f:
             for line in f:
                 if "Accuracy" in line:
                     return float(line.split(":")[1])
@@ -55,7 +63,7 @@ model_accuracy = load_accuracy()
 # -------------------------------
 app = Flask(__name__)
 
-UPLOAD_FOLDER = "static/uploads"
+UPLOAD_FOLDER = os.path.join(BASE_DIR, "static/uploads")
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 if not os.path.exists(UPLOAD_FOLDER):
@@ -78,11 +86,11 @@ def predict_image(filepath):
 
     label = class_names[predicted_class]
 
-    # 🎯 HANDLE UNKNOWN / OTHER
+    # 🎯 HANDLE UNKNOWN CLASS
     if label == "Other":
-        return "Unpredictable disease", None, None, None
+        return "Sorry, I know only 3 rice diseases 😅", None, None, None
 
-    # ✅ NORMAL CASE
+    # ✅ Normal case
     treatment = disease_info.get(label, {}).get("treatment", "")
     precaution = disease_info.get(label, {}).get("precaution", "")
 
@@ -94,13 +102,9 @@ def predict_image(filepath):
 @app.route("/", methods=["GET", "POST"])
 def index():
     if request.method == "POST":
-
-        if "file" not in request.files:
-            return render_template("index.html")
-
         file = request.files["file"]
 
-        if file and file.filename != "":
+        if file:
             filename = secure_filename(file.filename)
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             file.save(filepath)
@@ -120,8 +124,8 @@ def index():
     return render_template("index.html")
 
 # -------------------------------
-# RUN (DEPLOYMENT READY)
+# RUN
 # -------------------------------
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
+    port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
