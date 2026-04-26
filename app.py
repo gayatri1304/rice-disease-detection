@@ -82,7 +82,7 @@ model_accuracy = load_accuracy()
 # -------------------------------
 def predict_image(filepath):
     try:
-        load_resources()  # ensure model is loaded
+        load_resources()
 
         img = Image.open(filepath).convert("RGB")
         img = img.resize((224, 224))
@@ -98,8 +98,9 @@ def predict_image(filepath):
 
         label = class_names[predicted_class]
 
+        # ✅ UPDATED MESSAGE
         if label == "Other":
-            return "Sorry, I know only 3 rice diseases 😅", None, None, None
+            return "Invalid image or unpredictable image ❌", None, None, None
 
         treatment = disease_info.get(label, {}).get("treatment", "")
         precaution = disease_info.get(label, {}).get("precaution", "")
@@ -108,7 +109,7 @@ def predict_image(filepath):
 
     except Exception as e:
         print("❌ PREDICTION ERROR:", str(e))
-        return "Invalid image ❌", None, None, None
+        return "Invalid image or unpredictable image ❌", None, None, None
 
 # -------------------------------
 # ROUTE
@@ -140,12 +141,12 @@ def index():
 
         except Exception as e:
             print("❌ ROUTE ERROR:", str(e))
-            return render_template("index.html", label="Error processing image ❌")
+            return render_template("index.html", label="Invalid image or unpredictable image ❌")
 
     return render_template("index.html")
 
 # -------------------------------
-# RENDER PORT FIX
+# PORT (FOR RENDER)
 # -------------------------------
 port = int(os.environ.get("PORT", 10000))
 
