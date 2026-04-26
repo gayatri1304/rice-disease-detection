@@ -1,0 +1,5 @@
+myenv/
+dataset/
+__pycache__/
+*.pyc
+*.npy
