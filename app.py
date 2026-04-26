@@ -25,52 +25,51 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 # -------------------------------
-# LOAD MODEL AT STARTUP (FAST)
+# GLOBAL CACHE (IMPORTANT ⚡)
 # -------------------------------
-model_path = os.path.join(BASE_DIR, "rice_model.keras")
-model = load_model(model_path)
-print("✅ Model loaded")
+model = None
+class_names = None
 
-# -------------------------------
-# LOAD CLASS NAMES
-# -------------------------------
-class_path = os.path.join(BASE_DIR, "class_names.json")
-with open(class_path, "r") as f:
-    class_names = json.load(f)
-print("✅ Class names loaded")
+def load_resources():
+    global model, class_names
 
-# -------------------------------
-# WARM UP MODEL (VERY IMPORTANT)
-# -------------------------------
-dummy = np.zeros((1, 224, 224, 3))
-model.predict(dummy)
-print("🔥 Model warmed up")
+    if model is None:
+        print("⏳ Loading model...")
+        model_path = os.path.join(BASE_DIR, "rice_model.keras")
+        model = load_model(model_path)
+        print("✅ Model loaded")
+
+    if class_names is None:
+        print("⏳ Loading class names...")
+        class_path = os.path.join(BASE_DIR, "class_names.json")
+        with open(class_path, "r") as f:
+            class_names = json.load(f)
+        print("✅ Classes loaded")
 
 # -------------------------------
 # DISEASE INFO
 # -------------------------------
 disease_info = {
     "False Smut": {
-        "treatment": "Apply fungicides like Propiconazole or Carbendazim.",
-        "precaution": "Use certified seeds and avoid excess nitrogen fertilizer."
+        "treatment": "Apply Propiconazole or Carbendazim",
+        "precaution": "Avoid excess nitrogen fertilizer"
     },
     "Leaf Smut": {
-        "treatment": "Spray Mancozeb or Copper fungicides.",
-        "precaution": "Ensure proper spacing and avoid water stagnation."
+        "treatment": "Spray Mancozeb",
+        "precaution": "Avoid water stagnation"
     },
     "Narrow Brown Leaf Spot": {
-        "treatment": "Apply Tricyclazole.",
-        "precaution": "Use resistant varieties and balanced fertilization."
+        "treatment": "Apply Tricyclazole",
+        "precaution": "Use resistant varieties"
     }
 }
 
 # -------------------------------
-# LOAD ACCURACY
+# ACCURACY
 # -------------------------------
 def load_accuracy():
     try:
-        metrics_path = os.path.join(BASE_DIR, "metrics.txt")
-        with open(metrics_path, "r") as f:
+        with open(os.path.join(BASE_DIR, "metrics.txt")) as f:
             for line in f:
                 if "Accuracy" in line:
                     return float(line.split(":")[1])
@@ -80,27 +79,30 @@ def load_accuracy():
 model_accuracy = load_accuracy()
 
 # -------------------------------
-# PREDICTION FUNCTION
+# FAST PREDICTION
 # -------------------------------
 def predict_image(filepath):
     try:
-        img = Image.open(filepath).convert("RGB")
-        img = img.resize((224, 224), Image.BILINEAR)
+        load_resources()
 
-        img_array = np.array(img)
+        img = Image.open(filepath).convert("RGB")
+        img = img.resize((224, 224))
+
+        img_array = np.array(img, dtype=np.float32)
         img_array = preprocess_input(img_array)
         img_array = np.expand_dims(img_array, axis=0)
 
-        preds = model.predict(img_array)[0]
+        # ⚡ FAST inference
+        preds = model.predict(img_array, verbose=0)[0]
 
         predicted_class = np.argmax(preds)
         confidence = float(np.max(preds)) * 100
 
         label = class_names[predicted_class]
 
-        # CUSTOM MESSAGE
+        # ❌ remove unwanted sentence
         if label == "Other":
-            return "Invalid image or unpredictable image ❌", None, None, None
+            return "Invalid image ❌", None, None, None
 
         treatment = disease_info.get(label, {}).get("treatment", "")
         precaution = disease_info.get(label, {}).get("precaution", "")
@@ -108,8 +110,8 @@ def predict_image(filepath):
         return label, confidence, treatment, precaution
 
     except Exception as e:
-        print("❌ PREDICTION ERROR:", str(e))
-        return "Invalid image or unpredictable image ❌", None, None, None
+        print("❌ ERROR:", str(e))
+        return "Invalid image ❌", None, None, None
 
 # -------------------------------
 # ROUTE
@@ -117,41 +119,32 @@ def predict_image(filepath):
 @app.route("/", methods=["GET", "POST"])
 def index():
     if request.method == "POST":
-        try:
-            file = request.files.get("file")
+        file = request.files.get("file")
 
-            if not file or file.filename == "":
-                return render_template("index.html", label="Please upload an image")
+        if not file or file.filename == "":
+            return render_template("index.html", label="Upload an image")
 
-            filename = secure_filename(file.filename)
-            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            file.save(filepath)
+        filename = secure_filename(file.filename)
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        file.save(filepath)
 
-            label, confidence, treatment, precaution = predict_image(filepath)
+        label, confidence, treatment, precaution = predict_image(filepath)
 
-            return render_template(
-                "index.html",
-                label=label,
-                confidence=round(confidence, 2) if confidence else None,
-                accuracy=round(model_accuracy * 100, 2),
-                image_path=filepath,
-                treatment=treatment,
-                precaution=precaution
-            )
-
-        except Exception as e:
-            print("❌ ROUTE ERROR:", str(e))
-            return render_template("index.html", label="Invalid image or unpredictable image ❌")
+        return render_template(
+            "index.html",
+            label=label,
+            confidence=round(confidence, 2) if confidence else None,
+            accuracy=round(model_accuracy * 100, 2),
+            image_path=filepath,
+            treatment=treatment,
+            precaution=precaution
+        )
 
     return render_template("index.html")
 
 # -------------------------------
-# PORT (RENDER)
-# -------------------------------
-port = int(os.environ.get("PORT", 10000))
-
-# -------------------------------
-# RUN (LOCAL ONLY)
+# RENDER PORT FIX
 # -------------------------------
 if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
